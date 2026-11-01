@@ -1,0 +1,267 @@
+Enter file contents here 
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JARVIS AI</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#07111f;color:#e9f5ff;
+ font-family:Arial,sans-serif
+}
+main{max-width:650px;margin:auto;padding:22px}
+h1{
+ color:#53d9ff;letter-spacing:5px;
+ text-align:center
+}
+.sub{text-align:center;color:#91a7bc}
+.panel{
+ background:#102338;
+ border:1px solid #24516b;
+ border-radius:18px;
+ padding:18px;margin:18px 0
+}
+button{
+ background:#087caa;color:white;
+ border:0;border-radius:12px;
+ padding:14px;cursor:pointer;font-size:15px
+}
+button:disabled{opacity:.4}
+input{
+ background:#071726;color:white;
+ border:1px solid #35617a;
+ border-radius:10px;padding:13px;
+ width:100%;font-size:16px
+}
+.row{display:flex;gap:8px;margin-top:12px}
+.row input{flex:1;min-width:0}
+#mic{
+ display:block;margin:22px auto;
+ border-radius:50%;
+ width:115px;height:115px;
+ font-size:35px;background:#075577;
+ box-shadow:0 0 30px #075577
+}
+#mic.active{
+ background:#bb3448;
+ box-shadow:0 0 35px #bb3448
+}
+#log{
+ white-space:pre-wrap;
+ line-height:1.6;min-height:90px
+}
+small{color:#94a9bb}
+.item{
+ padding:10px;
+ border-bottom:1px solid #28435a
+}
+</style>
+</head>
+<body>
+<main>
+<h1>JARVIS</h1>
+<p class="sub">
+Kişisel & BLITZ Glasreinigung Asistanı
+</p>
+
+<div class="panel">
+<h3>🎙️ Sesli Asistan</h3>
+<button id="mic">🎙️</button>
+<p id="status" style="text-align:center">Hazır</p>
+<div class="row">
+<input id="command"
+ placeholder="JARVIS'e bir şey yaz...">
+<button id="send">Gönder</button>
+</div>
+<p id="log">
+Merhaba. Ben JARVIS. Nasıl yardımcı olabilirim?
+</p>
+</div>
+
+<div class="panel">
+<h3>📝 Notlar</h3>
+<div id="notes"></div>
+</div>
+
+<div class="panel">
+<h3>🏢 Şirket İş Planı</h3>
+<div id="jobs"></div>
+</div>
+
+<small>
+Veriler yalnızca bu tarayıcıda saklanır.
+Bu ilk sürüme gizli müşteri bilgilerini eklemeyin.
+</small>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function load(key){
+ try{
+  return JSON.parse(localStorage.getItem(key)) || [];
+ }catch{
+  return [];
+ }
+}
+
+let notes=load("jarvis_notes");
+let jobs=load("jarvis_jobs");
+
+function save(){
+ localStorage.setItem(
+  "jarvis_notes",JSON.stringify(notes)
+ );
+ localStorage.setItem(
+  "jarvis_jobs",JSON.stringify(jobs)
+ );
+ render();
+}
+
+function render(){
+ $("notes").replaceChildren();
+ $("jobs").replaceChildren();
+
+ function fill(id,items){
+  const root=$(id);
+  if(!items.length){
+   root.textContent="Henüz kayıt yok.";
+   return;
+  }
+  items.forEach((value,i)=>{
+   const div=document.createElement("div");
+   div.className="item";
+   div.textContent=(i+1)+". "+value;
+   root.appendChild(div);
+  });
+ }
+ fill("notes",notes);
+ fill("jobs",jobs);
+}
+
+function speak(message){
+ $("log").textContent="JARVIS: "+message;
+ if("speechSynthesis" in window){
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(message);
+  u.lang="tr-TR";
+  u.rate=1;
+  speechSynthesis.speak(u);
+ }
+}
+
+function processCommand(raw){
+ const original=raw.trim();
+ const cmd=original.toLocaleLowerCase("tr-TR");
+ if(!cmd)return;
+
+ let answer="";
+
+ if(cmd.startsWith("not al ")){
+  const note=original.slice(7).trim();
+  notes.push(note);
+  save();
+  answer="Notunu kaydettim.";
+ }
+ else if(cmd.startsWith("iş ekle ")){
+  jobs.push(original.slice(8).trim());
+  save();
+  answer="İşi şirket planına ekledim.";
+ }
+ else if(cmd.includes("notlarımı oku")){
+  answer=notes.length
+   ?notes.join(". ")
+   :"Henüz notun yok.";
+ }
+ else if(
+  cmd.includes("iş planını oku") ||
+  cmd.includes("bugünkü plan")
+ ){
+  answer=jobs.length
+   ?jobs.join(". ")
+   :"Kayıtlı iş bulunmuyor.";
+ }
+ else if(cmd.includes("saat kaç")){
+  answer="Saat "+
+   new Date().toLocaleTimeString(
+    "tr-TR",{hour:"2-digit",minute:"2-digit"}
+   );
+ }
+ else if(cmd.includes("bugün tarih")){
+  answer="Bugün "+
+   new Date().toLocaleDateString("tr-TR");
+ }
+ else if(
+  cmd.includes("merhaba") ||
+  cmd==="jarvis"
+ ){
+  answer="Buradayım. Seni dinliyorum.";
+ }
+ else{
+  answer="Bu komutu henüz bilmiyorum. "+
+   "Not al veya iş ekle diyebilirsin.";
+ }
+ speak(answer);
+}
+
+$("send").onclick=()=>{
+ processCommand($("command").value);
+ $("command").value="";
+};
+
+$("command").addEventListener("keydown",e=>{
+ if(e.key==="Enter")$("send").click();
+});
+
+const Recognition=
+ window.SpeechRecognition ||
+ window.webkitSpeechRecognition;
+
+if(Recognition){
+ const recognition=new Recognition();
+ recognition.lang="tr-TR";
+ recognition.continuous=false;
+ recognition.interimResults=false;
+
+ $("mic").onclick=()=>{
+  try{
+   recognition.start();
+  }catch(e){
+   $("status").textContent=
+    "Mikrofon başlatılamadı.";
+  }
+ };
+
+ recognition.onstart=()=>{
+  $("mic").classList.add("active");
+  $("status").textContent="Dinliyorum...";
+ };
+
+ recognition.onend=()=>{
+  $("mic").classList.remove("active");
+  $("status").textContent="Hazır";
+ };
+
+ recognition.onerror=e=>{
+  $("status").textContent=
+   "Ses hatası: "+e.error;
+ };
+
+ recognition.onresult=e=>{
+  const spoken=e.results[0][0].transcript;
+  $("command").value=spoken;
+  processCommand(spoken);
+ };
+}else{
+ $("mic").disabled=true;
+ $("status").textContent=
+  "Bu tarayıcı ses tanımayı desteklemiyor. "+
+  "Yazılı komut kullan.";
+}
+
+render();
+</script>
+</body>
+</html>
